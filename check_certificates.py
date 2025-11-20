@@ -98,7 +98,12 @@ class CertificateChecker:
         two_days = now + timedelta(days=2)
         two_weeks = now + timedelta(days=14)
 
-        categories = {"expired": [], "tomorrow": [], "forty_eight_hours": [], "two_weeks": []}
+        categories: dict[str, list[dict[str, Any]]] = {
+            "expired": [],
+            "tomorrow": [],
+            "forty_eight_hours": [],
+            "two_weeks": [],
+        }
 
         for app in apps:
             app_name = app.get("displayName", "Unknown")
@@ -204,7 +209,8 @@ class CertificateChecker:
 
             # Send to Slack if needed
             if self.cache.should_notify(categories, changes):
-                send_slack_notification(categories, self.slack_webhook, changes)
+                if self.slack_webhook:
+                    send_slack_notification(categories, self.slack_webhook, changes)
             else:
                 print("ℹ No notification sent (no critical issues or changes)")
 

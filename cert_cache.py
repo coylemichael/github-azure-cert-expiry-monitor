@@ -19,7 +19,8 @@ class CertificateCache:
         if self.cache_file.exists():
             try:
                 with open(self.cache_file) as f:
-                    return json.load(f)
+                    data: dict[str, Any] = json.load(f)
+                    return data
             except (json.JSONDecodeError, OSError) as e:
                 print(f"⚠ Warning: Could not load cache: {e}")
         return {"last_updated": None, "certificates": {}}

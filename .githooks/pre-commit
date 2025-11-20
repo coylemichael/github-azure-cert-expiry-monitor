@@ -1,0 +1,16 @@
+#!/bin/sh
+# Pre-commit hook to run all CI checks before committing
+# This ensures commits always pass CI
+
+echo "Running ruff lint check..."
+ruff check . || exit 1
+
+echo "Running ruff format check..."
+ruff format --check . || exit 1
+
+echo "Running mypy type check..."
+mypy *.py || exit 1
+
+echo ""
+echo "All CI checks passed! Committing..."
+exit 0

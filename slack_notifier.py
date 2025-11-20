@@ -68,17 +68,11 @@ def build_slack_blocks(
         }
     )
 
-    blocks.append(
-        {
-            "type": "context",
-            "elements": [
-                {
-                    "type": "mrkdwn",
-                    "text": f"Weekly certificate check | {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
-                }
-            ],
-        }
-    )
+    context_element: dict[str, str] = {
+        "type": "mrkdwn",
+        "text": f"Weekly certificate check | {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    }
+    blocks.append({"type": "context", "elements": [context_element]})  # type: ignore[list-item]
 
     blocks.append({"type": "divider"})
 
@@ -137,7 +131,9 @@ def build_slack_blocks(
 
 
 def send_slack_notification(
-    categories: dict[str, list[dict[str, Any]]], webhook_url: str, changes: dict[str, list[dict[str, Any]]] | None = None
+    categories: dict[str, list[dict[str, Any]]],
+    webhook_url: str,
+    changes: dict[str, list[dict[str, Any]]] | None = None,
 ) -> None:
     """Send formatted notification to Slack"""
     blocks = build_slack_blocks(categories, changes)

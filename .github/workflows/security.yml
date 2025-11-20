@@ -1,0 +1,37 @@
+name: Security Analysis
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  SCA_REQUIRED: true
+  SAST_REQUIRED: true
+  IVS_REQUIRED: false
+  EXCLUDE_FROM_SCANNING: false
+  SNYK_ORG_ID: "platform-engineering-devops"
+
+jobs:
+  security-analysis:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Snyk Python Scan
+        uses: accelins/rx-common-github/actions/snyk-python@main
+        with:
+          snyk_token: ${{ secrets.SNYK_TOKEN }}
+          snyk_org_id: ${{ env.SNYK_ORG_ID }}
