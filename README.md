@@ -22,11 +22,10 @@ Integrates with Microsoft Graph API to monitor certificate and client secret exp
 
 ### Azure AD App Registration
 
-Create app registration `github-azure-cert-expiry-monitor` with:
+Create app registration `github-azure-cert-expiry-monitor` with the following Application permissions:
 
-- **Application.Read.All** (Application permission, admin consent required)
-- **ServicePrincipalEndpoint.Read.All** (Application permission, admin consent required)
-- Federated credentials configured for GitHub Actions (branch: main, environment: blank)
+- **Application.Read.All** 
+- **ServicePrincipalEndpoint.Read.All**
 
 ### GitHub Secrets
 
