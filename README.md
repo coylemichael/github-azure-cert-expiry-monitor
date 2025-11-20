@@ -22,25 +22,11 @@ Integrates with Microsoft Graph API to monitor certificate and client secret exp
 
 ### Azure AD App Registration
 
-Create app registration `github-azure-cert-expiry-monitor`:
+Create app registration `github-azure-cert-expiry-monitor` with:
 
-**API Permissions** (Application-level, admin consent required):
-```
-Application.Read.All
-ServicePrincipalEndpoint.Read.All
-```
-
-**Federated Credentials:**
-1. App Registration → Certificates & credentials → Federated credentials
-2. Add credential:
-   - Scenario: GitHub Actions deploying Azure resources
-   - Organization: `accelins`
-   - Repository: `exp-azure-cert-expiry-monitor`
-   - Entity type: Branch
-   - Branch name: `main`
-3. Add second credential:
-   - Entity type: Environment
-   - Environment name: (leave blank)
+- **Application.Read.All** (Application permission, admin consent required)
+- **ServicePrincipalEndpoint.Read.All** (Application permission, admin consent required)
+- Federated credentials configured for GitHub Actions (branch: main, environment: blank)
 
 ### GitHub Secrets
 
