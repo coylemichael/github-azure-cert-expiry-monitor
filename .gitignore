@@ -15,6 +15,9 @@ ENV/
 # Certificate cache
 cert_cache.json
 
+# Organization-specific workflows (not for personal repo)
+.github/workflows/security.yml
+
 # IDE
 .vscode/
 .idea/
