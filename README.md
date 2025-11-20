@@ -4,143 +4,91 @@ Automated monitoring and alerting for Azure AD enterprise application certificat
 
 ## Overview
 
-This tool integrates with Microsoft Graph API to continuously monitor certificate and client secret expiration dates across all Azure AD enterprise applications. It provides proactive Slack notifications categorized by urgency levels, with intelligent caching to minimize API calls and reduce alert noise.
+Integrates with Microsoft Graph API to monitor certificate and client secret expiration dates across Azure AD enterprise applications. Provides proactive Slack notifications with intelligent caching to minimize API calls and reduce alert noise.
 
-## Features
-
-- **Comprehensive Coverage**: Monitors both certificates and client secrets across all Azure AD service principals
-- **Intelligent Caching**: JSON-based state tracking with change detection to prevent redundant API calls
-- **Smart Notifications**: Only alerts on critical expirations, new certificates, or detected changes
-- **Urgency Categories**: Expired, Tomorrow, 48 Hours, 2 Weeks
-- **OIDC Authentication**: Secure workload identity federation (no long-lived secrets in GitHub)
-- **Automated Execution**: Weekly scheduled runs via GitHub Actions with manual trigger support
+**Key Features:**
+- Monitors certificates and client secrets across all service principals
+- Smart notifications for critical expirations, new certificates, or detected changes
+- Categorizes by urgency: Expired, Tomorrow, 48 Hours, 2 Weeks
+- Weekly scheduled runs with manual trigger support
 
 ## Prerequisites
 
-- Azure AD App Registration with appropriate API permissions and federated credentials
-- Slack webhook URL for notifications
+- Azure AD App Registration with API permissions and federated credentials
+- Slack webhook URL
 - GitHub repository with Actions enabled
 
 ## Setup
 
 ### Azure AD App Registration
 
-Create an app registration named `github-azure-cert-expiry-monitor` with the following configuration:
+Create app registration `github-azure-cert-expiry-monitor`:
 
-**API Permissions** (Application-level, requires admin consent):
+**API Permissions** (Application-level, admin consent required):
 ```
 Application.Read.All
 ServicePrincipalEndpoint.Read.All
 ```
 
-**Federated Credentials** (for OIDC authentication):
-
-1. Navigate to App Registration → Certificates & credentials → Federated credentials
-2. Add credential for branch deployments:
+**Federated Credentials:**
+1. App Registration → Certificates & credentials → Federated credentials
+2. Add credential:
    - Scenario: GitHub Actions deploying Azure resources
    - Organization: `accelins`
    - Repository: `exp-azure-cert-expiry-monitor`
    - Entity type: Branch
    - Branch name: `main`
-3. Add credential for manual workflow runs:
+3. Add second credential:
    - Entity type: Environment
    - Environment name: (leave blank)
 
-### GitHub Repository Configuration
+### GitHub Secrets
 
-Add the following secrets to repository settings (Settings → Secrets and variables → Actions):
+Add to repository settings (Settings → Secrets and variables → Actions):
 
 ```
-AZURE_TENANT_ID         # Azure AD tenant ID
-AZURE_CLIENT_ID         # App registration client ID
-SLACK_WEBHOOK_URL       # Slack incoming webhook URL
+AZURE_TENANT_ID
+AZURE_CLIENT_ID
+SLACK_WEBHOOK_URL
 ```
 
-### Slack Webhook Setup
+### Slack Webhook
 
-1. Navigate to https://api.slack.com/apps
-2. Create or select your application
-3. Enable Incoming Webhooks
-4. Add webhook to target channel
-5. Copy webhook URL to GitHub secrets
+1. Create incoming webhook at https://api.slack.com/apps
+2. Add webhook URL to GitHub secrets
 
 ## Usage
 
-### Automated Execution
+**Automated:** Runs every Monday at 09:00 UTC
 
-The workflow runs automatically every Monday at 09:00 UTC. This can be modified in `.github/workflows/check-certificates.yml`.
+**Manual:** Actions → Certificate Expiry Check → Run workflow
 
-### Manual Execution
-
-Navigate to Actions → Certificate Expiry Check → Run workflow
-
-### Local Development
-
-For local testing and development:
+## Local Development
 
 ```bash
-# Clone repository
 git clone https://github.com/accelins/exp-azure-cert-expiry-monitor.git
 cd exp-azure-cert-expiry-monitor
 
-# Install dependencies
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
 
-# Configure environment (requires client secret for local auth)
+# Configure environment (requires client secret)
 cp .env.example .env
-# Edit .env with your credentials
+# Edit .env with credentials
 
-# Execute check
 python check_certificates.py
-```
-
-## Development
-
-### Setup Git Hooks
-
-Enable pre-commit hooks for automatic quality checks:
-
-```bash
-git config core.hooksPath .githooks
 ```
 
 ### Quality Checks
 
-The pre-commit hook automatically runs:
-- Ruff linting (`ruff check .`)
-- Code formatting (`ruff format --check .`)
-- Type checking (`mypy *.py`)
-
-Manual execution:
-
+Enable pre-commit hooks:
 ```bash
-ruff check .
-ruff format .
-mypy *.py
+git config core.hooksPath .githooks
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development guidelines.
+Runs automatically before commit:
+- `ruff check .` - Linting
+- `ruff format --check .` - Formatting
+- `mypy *.py` - Type checking
 
-## Architecture
-
-- **check_certificates.py**: Main execution logic, Azure Graph API integration
-- **cert_cache.py**: State management and change detection
-- **slack_notifier.py**: Slack message formatting and delivery
-- **.github/workflows/check-certificates.yml**: Automated execution workflow
-- **.github/workflows/ci.yml**: Continuous integration checks
-- **.github/workflows/security.yml**: Snyk security scanning
-
-## Notification Logic
-
-Notifications are sent when:
-- Certificates or secrets have expired
-- Expirations within 24 hours detected
-- New certificates appear in estate
-- Certificates are removed (potential rotation)
-- Expiry dates change unexpectedly
-- Weekly summary (every Monday, regardless of changes)
-
-## License
-
-Proprietary - Accelerant Holdings
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
