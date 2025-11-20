@@ -75,5 +75,3 @@ Runs automatically before commit:
 - `ruff check .` - Linting
 - `ruff format --check .` - Formatting
 - `mypy *.py` - Type checking
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
