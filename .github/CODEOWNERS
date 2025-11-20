@@ -1,0 +1,13 @@
+# Code Owners for Azure Certificate Expiry Monitor
+# These owners will be automatically requested for review when someone opens a pull request.
+
+# Default owners for everything in the repo
+* @accelins/cloud-security-engineering
+
+# Workflow and configuration files
+/.github/ @accelins/cloud-security-engineering
+*.yml @accelins/cloud-security-engineering
+*.yaml @accelins/cloud-security-engineering
+
+# Python scripts
+*.py @accelins/cloud-security-engineering
