@@ -44,6 +44,5 @@ jobs:
           mypy *.py
 
       - name: Run tests with coverage
-        if: false  # Disable until tests are written
         run: |
           pytest --cov=. --cov-report=xml --cov-report=term-missing --cov-fail-under=80 -q

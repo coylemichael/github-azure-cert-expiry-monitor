@@ -9,8 +9,10 @@ echo "Running ruff lint check..."
 ruff check . || exit 1
 
 echo "Running mypy type check..."
-mypy *.py || exit 1
+python -m mypy *.py || exit 1
 
 echo ""
 echo "All CI checks passed! Committing..."
 exit 0
+
+
