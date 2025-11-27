@@ -2,8 +2,9 @@ name: Certificate Expiry Check
 
 on:
   schedule:
-    # Run every Monday at 9:00 AM UTC
+    # Run every Monday and Thursday at 9:00 AM UTC
     - cron: '0 9 * * 1'
+    - cron: '0 9 * * 4'
   workflow_dispatch:  # Manual trigger for testing
 
 permissions:
@@ -60,7 +61,6 @@ jobs:
         run: python check_certificates.py
 
       - name: Upload report
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: certificate-expiry-report
@@ -71,7 +71,6 @@ jobs:
           retention-days: 30
 
       - name: Save certificate cache
-        if: always()
         uses: actions/cache/save@v4
         with:
           path: cert_cache.json

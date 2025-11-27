@@ -8,124 +8,175 @@ from typing import Any
 
 import requests
 
+MAX_SLACK_ITEMS = 10  # limit items per bucket to avoid huge messages
 
-def format_cert_list(certs: list[dict[str, Any]], limit: int = 10) -> str:
-    """Format certificate list for Slack message"""
+
+def _human_time_until(expiry: datetime) -> str:
+    """
+    Return strings like:
+      - 'in 17 minutes'
+      - 'in 3 hours'
+      - 'in 5 days'
+      - 'in less than a minute'
+    """
+    now = datetime.utcnow()
+    seconds = int((expiry - now).total_seconds())
+
+    if seconds <= 0:
+        return "now"
+
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, _ = divmod(rem, 60)
+
+    if days > 1:
+        return f"in {days} days"
+    if days == 1:
+        return "in 1 day"
+    if hours > 1:
+        return f"in {hours} hours"
+    if hours == 1:
+        return "in 1 hour"
+    if minutes > 1:
+        return f"in {minutes} minutes"
+    if minutes == 1:
+        return "in 1 minute"
+    return "in less than a minute"
+
+
+def _compact_when(when: str) -> str:
+    """
+    Convert verbose 'in 57 days' / 'in 3 hours' / 'in 17 minutes'
+    into 'in 57d' / 'in 3h' / 'in 17m'.
+    """
+    return (
+        when.replace(" days", "d")
+        .replace(" day", "d")
+        .replace(" hours", "h")
+        .replace(" hour", "h")
+        .replace(" minutes", "m")
+        .replace(" minute", "m")
+    )
+
+
+def format_cert_list(certs: list[dict[str, Any]]) -> str:
+    """Format certificate list for Slack message."""
     if not certs:
         return "_None_"
 
-    lines = []
-    for _i, cert in enumerate(certs[:limit]):
+    lines: list[str] = []
+
+    for cert in certs[:MAX_SLACK_ITEMS]:
         app_name = cert["app_name"]
-        cert_type = cert["type"]
-        expiry = cert["expiry_date"].strftime("%Y-%m-%d %H:%M UTC")
-        days = cert["days_until_expiry"]
+        expiry: datetime = cert["expiry_date"]
+        portal_link = cert.get("portal_link", "")
 
-        if days < 0:
-            day_text = f"*EXPIRED {abs(days)} days ago*"
-        elif days == 0:
-            day_text = "*TODAY*"
-        elif days == 1:
-            day_text = "*TOMORROW*"
+        # Date/time formatting:
+        #   - hyperlink text: DD-MM-YY
+        #   - time: HH:MM (plain text)
+        date_str = expiry.strftime("%d-%m-%y")
+        time_str = expiry.strftime("%H:%M")
+
+        when_full = _human_time_until(expiry)       # e.g. "in 57 days"
+        when_compact = _compact_when(when_full)     # e.g. "in 57d"
+
+        if portal_link:
+            # Only the date part is clickable
+            date_link = f"<{portal_link}|{date_str}>"
         else:
-            day_text = f"in {days} days"
+            date_link = date_str
 
-        lines.append(f"• `{app_name}` - {cert_type} expires {day_text} ({expiry})")
+        # Final compact line:
+        # [App Name] · in 57d · 22-01-26 - 17:54
+        lines.append(f"[`{app_name}`] · {when_compact} · {date_link} - {time_str}")
 
-    if len(certs) > limit:
-        lines.append(f"\n_...and {len(certs) - limit} more_")
+    if len(certs) > MAX_SLACK_ITEMS:
+        lines.append(f"_...and {len(certs) - MAX_SLACK_ITEMS} more_")
 
     return "\n".join(lines)
 
 
 def build_slack_blocks(
-    categories: dict[str, list[dict[str, Any]]], changes: dict[str, list[dict[str, Any]]] | None = None
+    categories: dict[str, list[dict[str, Any]]],
+    changes: dict[str, list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Build Slack Block Kit message"""
-    blocks = []
+    """Build Slack Block Kit message."""
+    blocks: list[dict[str, Any]] = []
 
-    # Header
-    total_issues = sum(len(v) for v in categories.values())
-
-    if total_issues == 0:
+    total_items = sum(len(v) for v in categories.values())
+    if total_items == 0:
         blocks.append(
             {
                 "type": "header",
-                "text": {"type": "plain_text", "text": "✅ Certificate Status: All Clear", "emoji": True},
+                "text": {
+                    "type": "plain_text",
+                    "text": "✅ Certificate Status: All Clear",
+                    "emoji": True,
+                },
             }
         )
         blocks.append(
-            {"type": "section", "text": {"type": "mrkdwn", "text": "No certificates are expiring in the next 2 weeks."}}
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "No certificates are expiring within the configured time windows.",
+                },
+            }
         )
         return blocks
 
-    # Alert header
-    icon = "🚨" if (categories["expired"] or categories["tomorrow"]) else "⚠️"
+    urgent = bool(categories.get("today") or categories.get("tomorrow"))
+    icon = "🚨" if urgent else "⚠️"
+
+    # Header
     blocks.append(
         {
             "type": "header",
-            "text": {"type": "plain_text", "text": f"{icon} Azure Certificate Expiration Alert", "emoji": True},
+            "text": {
+                "type": "plain_text",
+                "text": f"{icon} Azure Certificate Expiration Alert",
+                "emoji": True,
+            },
         }
     )
 
-    context_element: dict[str, str] = {
-        "type": "mrkdwn",
-        "text": f"Weekly certificate check | {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
-    }
-    blocks.append({"type": "context", "elements": [context_element]})  # type: ignore[list-item]
+    # Context with single UTC note + date format hint
+    blocks.append(
+        {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"Certificate check | "
+                        f"{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} "
+                        f"(all times in UTC - DD-MM-YY)"
+                    ),
+                }
+            ],
+        }
+    )
 
     blocks.append({"type": "divider"})
 
-    # Expired certificates (Critical)
-    if categories["expired"]:
+    # Render each non-empty bucket, in dict order
+    for bucket_name, certs in categories.items():
+        if not certs:
+            continue
+
+        label = bucket_name.replace("_", " ").title()
+
         blocks.append(
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*🔴 EXPIRED ({len(categories['expired'])})*\n{format_cert_list(categories['expired'])}",
+                    "text": f"*🔹 {label} ({len(certs)})*\n{format_cert_list(certs)}",
                 },
             }
         )
         blocks.append({"type": "divider"})
-
-    # Expiring tomorrow (Critical)
-    if categories["tomorrow"]:
-        blocks.append(
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*🔴 EXPIRING TOMORROW ({len(categories['tomorrow'])})*\n{format_cert_list(categories['tomorrow'])}",
-                },
-            }
-        )
-        blocks.append({"type": "divider"})
-
-    # Expiring in 48 hours (High)
-    if categories["forty_eight_hours"]:
-        blocks.append(
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*🟠 EXPIRING IN 48 HOURS ({len(categories['forty_eight_hours'])})*\n{format_cert_list(categories['forty_eight_hours'])}",
-                },
-            }
-        )
-        blocks.append({"type": "divider"})
-
-    # Expiring in 2 weeks (Warning)
-    if categories["two_weeks"]:
-        blocks.append(
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*🟡 EXPIRING IN 2 WEEKS ({len(categories['two_weeks'])})*\n{format_cert_list(categories['two_weeks'])}",
-                },
-            }
-        )
 
     return blocks
 
@@ -135,13 +186,13 @@ def send_slack_notification(
     webhook_url: str,
     changes: dict[str, list[dict[str, Any]]] | None = None,
 ) -> None:
-    """Send formatted notification to Slack"""
+    """Send formatted notification to Slack."""
     blocks = build_slack_blocks(categories, changes)
 
     # Determine message color based on urgency
-    if categories["expired"] or categories["tomorrow"]:
+    if categories.get("today") or categories.get("tomorrow"):
         color = "danger"
-    elif categories["forty_eight_hours"]:
+    elif categories.get("forty_eight_hours") or categories.get("two_weeks"):
         color = "warning"
     else:
         color = "good"

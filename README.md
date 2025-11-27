@@ -1,77 +1,24 @@
-# Azure Certificate Expiry Monitor
+# Azure App Registration Certificate Expiry Monitor
 
-Automated monitoring and alerting for Azure AD enterprise application certificate and secret expirations.
+Checks certificate and client secret expirations on Azure AD **App Registrations** (not enterprise apps) and posts Slack alerts with links straight to the Certificates & Secrets blade. Expired items are intentionally ignored; buckets start at "today" and beyond.
 
-## Overview
-
-Integrates with Microsoft Graph API to monitor certificate and client secret expiration dates across Azure AD enterprise applications. Provides proactive Slack notifications with intelligent caching to minimize API calls and reduce alert noise.
-
-**Key Features:**
-- Monitors certificates and client secrets across all service principals
-- Smart notifications for critical expirations, new certificates, or detected changes
-- Categorizes by urgency: Expired, Tomorrow, 48 Hours, 2 Weeks
-- Weekly scheduled runs with manual trigger support
-
-## Prerequisites
-
-- Azure AD App Registration with API permissions and federated credentials
-- Slack webhook URL
-- GitHub repository with Actions enabled
+## How it works
+- Auth: client secret locally; GitHub Actions can be wired with `azure/login` OIDC (optional).
+- Data source: Microsoft Graph `/v1.0/applications`.
+- Buckets (hard-coded in `check_certificates.py`): today, tomorrow, 48 hours, 2 weeks, 1/3 months (6/12 months disabled by default). Edit `EXPIRY_BUCKETS` to change.
+- Caching: `cert_cache.json` tracks new/removed/changed creds and throttles notifications.
+- Schedule: runs Monday and Thursday at 09:00 UTC via workflow cron; summary pings also fire on those days (see `SUMMARY_DAYS` in `check_certificates.py` if you want to change).
+- Slack links: point straight to the App Registration Credentials (Certificates & Secrets) blade for quick action.
 
 ## Setup
+- Secrets: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` (local only), `SLACK_WEBHOOK_URL`.
+- Permissions for the app: `Application.Read.All` and `ServicePrincipalEndpoint.Read.All`.
 
-### Azure AD App Registration
-
-Create app registration `github-azure-cert-expiry-monitor` with the following Application permissions:
-
-- **Application.Read.All** 
-- **ServicePrincipalEndpoint.Read.All**
-
-### GitHub Secrets
-
-Add to repository settings (Settings → Secrets and variables → Actions):
-
-```
-AZURE_TENANT_ID
-AZURE_CLIENT_ID
-SLACK_WEBHOOK_URL
-```
-
-### Slack Webhook
-
-1. Create incoming webhook at https://api.slack.com/apps
-2. Add webhook URL to GitHub secrets
-
-## Usage
-
-**Automated:** Runs every Monday at 09:00 UTC
-
-**Manual:** Actions → Certificate Expiry Check → Run workflow
-
-## Local Development
-
+## Run locally
 ```bash
-git clone https://github.com/accelins/exp-azure-cert-expiry-monitor.git
-cd exp-azure-cert-expiry-monitor
-
 pip install -r requirements.txt
-pip install -r requirements-dev.txt
-
-# Configure environment (requires client secret)
-cp .env.example .env
-# Edit .env with credentials
-
 python check_certificates.py
 ```
 
-### Quality Checks
-
-Enable pre-commit hooks:
-```bash
-git config core.hooksPath .githooks
-```
-
-Runs automatically before commit:
-- `ruff check .` - Linting
-- `ruff format --check .` - Formatting
-- `mypy *.py` - Type checking
+## GitHub Actions
+Scheduled run Monday and Thursday (09:00 UTC) via `.github/workflows/check-certificates.yml`; manual trigger supported. To change cadence, edit the cron entries in that workflow. Configure secrets and optionally add `azure/login` for OIDC auth.

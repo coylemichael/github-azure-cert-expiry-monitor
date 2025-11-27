@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Schedule simplified to workflow cron (Monday and Thursday 09:00 UTC); summary notifications follow the same days.
+- Bucket toggles are now hard-coded constants (no YAML configuration).
+- Slack links now open directly to the Credentials (Certificates & Secrets) blade in Azure.
+
+### Added
+- Dependabot setup for pip and GitHub Actions updates.
+- CODEOWNERS file recorded.
+
 ## [0.1.0] - 2025-11-20
 
 ### Added
@@ -29,12 +40,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Azure AD authentication using MSAL library for local dev
 - No credential logging or exposure
 - Minimum required permissions (Application.Read.All, ServicePrincipalEndpoint.Read.All)
-
-## [Unreleased]
-
-### Planned
-- Add support for custom expiration thresholds
-- Email notification option
-- Microsoft Teams webhook support
-- Detailed HTML report generation
-- Certificate rotation reminder functionality
