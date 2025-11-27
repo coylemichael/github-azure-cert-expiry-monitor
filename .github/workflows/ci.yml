@@ -46,3 +46,5 @@ jobs:
       - name: Run tests with coverage
         run: |
           pytest --cov=. --cov-report=xml --cov-report=term-missing --cov-fail-under=80 -q
+        env:
+          PYTHONPATH: ${{ github.workspace }}
