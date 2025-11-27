@@ -3,13 +3,27 @@
 Checks certificate and client secret expirations on Azure AD **App Registrations** (not enterprise apps) and posts Slack alerts with links straight to the Certificates & Secrets blade. Expired items are intentionally ignored; buckets start at "today" and beyond.
 
 ## How it works
-- Auth: client secret locally; GitHub Actions can be wired with `azure/login` OIDC (optional).
-- Data source: Microsoft Graph `/v1.0/applications`.
-- Buckets (hard-coded in `check_certificates.py`): today, tomorrow, 48 hours, 2 weeks, 1/3 months (6/12 months disabled by default). Edit `EXPIRY_BUCKETS` to change.
-- Caching: `cert_cache.json` tracks new/removed/changed creds and throttles notifications.
-- Schedule: runs Monday and Thursday at 09:00 UTC via workflow cron; summary pings also fire on those days (see `SUMMARY_DAYS` in `check_certificates.py` if you want to change).
-- Slack links: point straight to the App Registration Credentials (Certificates & Secrets) blade for quick action.
-- Auth flow: CI uses OIDC/workload identity via `azure/login` (no client secret). Local runs use client secret from `.env`.
+Data comes from Microsoft Graph `/v1.0/applications`; expired creds are ignored. Slack links open directly to the App Registration Credentials (Certificates & Secrets) blade.
+
+Auth paths:
+- CI: `azure/login` with OIDC/workload identity (no client secret needed).
+- Local: client secret from `.env` is used if present.
+
+Buckets and schedule are code constants in `check_certificates.py`:
+```python
+SUMMARY_DAYS = {0, 3}  # Monday, Thursday
+EXPIRY_BUCKETS = {
+    "today": {"days": None, "enabled": True},
+    "tomorrow": {"days": None, "enabled": True},
+    "forty_eight_hours": {"days": 2, "enabled": True},
+    "two_weeks": {"days": 14, "enabled": True},
+    "one_month": {"days": 30, "enabled": True},
+    "three_months": {"days": 90, "enabled": True},
+    "six_months": {"days": 180, "enabled": False},
+    "one_year": {"days": 365, "enabled": False},
+}
+```
+Edit these to change cadence or buckets. `cert_cache.json` tracks changes to cut alert noise.
 
 ## Setup
 - Secrets: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` (local only), `SLACK_WEBHOOK_URL`.
