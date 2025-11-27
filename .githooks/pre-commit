@@ -11,6 +11,11 @@ ruff check . || exit 1
 echo "Running mypy type check..."
 python -m mypy *.py || exit 1
 
+echo "Running tests with coverage..."
+# Write coverage data to a temp location to avoid OneDrive/ACL issues
+export COVERAGE_FILE="${TMP:-/tmp}/.coverage"
+python -m pytest --cov --cov-report=term --cov-config=pyproject.toml || exit 1
+
 echo ""
 echo "All CI checks passed! Committing..."
 exit 0

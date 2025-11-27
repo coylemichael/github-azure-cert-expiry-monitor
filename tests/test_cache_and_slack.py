@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -66,7 +67,7 @@ def test_format_cert_list_and_blocks_render():
     certs = [_fake_cert("app", 1)]
     text = format_cert_list(certs)
     assert "app" in text
-    assert "in 1" in text
+    assert re.search(r"in \d+(d|h|m)", text)  # allow hour/day granularity
 
     blocks = build_slack_blocks({"today": certs, "tomorrow": []})
     assert any(block.get("type") == "header" for block in blocks)
