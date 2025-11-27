@@ -63,10 +63,10 @@ def test_should_notify_on_today_tomorrow_and_changes(tmp_path, monkeypatch):
 
 def test_format_cert_list_and_blocks_render():
     """Slack formatting renders items and sections correctly."""
-    certs = [_fake_cert("app", 2)]
+    certs = [_fake_cert("app", 1)]
     text = format_cert_list(certs)
     assert "app" in text
-    assert "in 2" in text
+    assert "in 1" in text
 
     blocks = build_slack_blocks({"today": certs, "tomorrow": []})
     assert any(block.get("type") == "header" for block in blocks)
