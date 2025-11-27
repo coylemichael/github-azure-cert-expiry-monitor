@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Schedule simplified to workflow cron (Monday and Thursday 09:00 UTC); summary notifications follow the same days.
 - Bucket toggles are now hard-coded constants (no YAML configuration).
 - Slack links now open directly to the Credentials (Certificates & Secrets) blade in Azure.
+- CI authentication clarified to prefer OIDC/workload identity; client secret kept only for local runs.
 
 ### Added
 - Dependabot setup for pip and GitHub Actions updates.

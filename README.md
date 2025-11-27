@@ -9,6 +9,7 @@ Checks certificate and client secret expirations on Azure AD **App Registrations
 - Caching: `cert_cache.json` tracks new/removed/changed creds and throttles notifications.
 - Schedule: runs Monday and Thursday at 09:00 UTC via workflow cron; summary pings also fire on those days (see `SUMMARY_DAYS` in `check_certificates.py` if you want to change).
 - Slack links: point straight to the App Registration Credentials (Certificates & Secrets) blade for quick action.
+- Auth flow: CI uses OIDC/workload identity via `azure/login` (no client secret). Local runs use client secret from `.env`.
 
 ## Setup
 - Secrets: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` (local only), `SLACK_WEBHOOK_URL`.

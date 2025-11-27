@@ -26,35 +26,38 @@ load_dotenv()
 # --------------------------------------------------------------
 SUMMARY_DAYS: set[int] = {0, 3}  # Monday, Thursday
 EXPIRY_BUCKETS: dict[str, dict[str, Any]] = {
-    "today":             {"days": None, "enabled": True},   # same UTC calendar day
-    "tomorrow":          {"days": None, "enabled": True},   # next UTC calendar day
-    "forty_eight_hours": {"days": 2,    "enabled": True},
-    "two_weeks":         {"days": 14,   "enabled": True},
-    "one_month":         {"days": 30,   "enabled": True},
-    "three_months":      {"days": 90,   "enabled": True},
-    "six_months":        {"days": 180,  "enabled": False},
-    "one_year":          {"days": 365,  "enabled": False},
+    "today": {"days": None, "enabled": True},  # same UTC calendar day
+    "tomorrow": {"days": None, "enabled": True},  # next UTC calendar day
+    "forty_eight_hours": {"days": 2, "enabled": True},
+    "two_weeks": {"days": 14, "enabled": True},
+    "one_month": {"days": 30, "enabled": True},
+    "three_months": {"days": 90, "enabled": True},
+    "six_months": {"days": 180, "enabled": False},
+    "one_year": {"days": 365, "enabled": False},
 }
 
 
 class CertificateChecker:
     def __init__(self) -> None:
-        self.tenant_id = os.environ.get("AZURE_TENANT_ID")
-        self.client_id = os.environ.get("AZURE_CLIENT_ID")
-        self.client_secret = os.environ.get("AZURE_CLIENT_SECRET")
-        self.slack_webhook = os.environ.get("SLACK_WEBHOOK_URL")
+        tenant_id = os.environ.get("AZURE_TENANT_ID") or ""
+        client_id = os.environ.get("AZURE_CLIENT_ID") or ""
+        client_secret = os.environ.get("AZURE_CLIENT_SECRET") or ""
+        slack_webhook = os.environ.get("SLACK_WEBHOOK_URL") or ""
 
-        if not all([self.tenant_id, self.client_id, self.slack_webhook]):
+        if not (tenant_id and client_id and slack_webhook):
             raise ValueError("Missing required environment variables")
+
+        self.tenant_id: str = tenant_id
+        self.client_id: str = client_id
+        self.client_secret: str = client_secret
+        self.slack_webhook: str = slack_webhook
 
         self.graph_endpoint = "https://graph.microsoft.com/v1.0"
         self.access_token: str | None = None
         self.cache = CertificateCache()
 
         # Bucket definitions: "days" is None for date-based buckets.
-        self.expiry_buckets: dict[str, dict[str, Any]] = {
-            name: cfg.copy() for name, cfg in EXPIRY_BUCKETS.items()
-        }
+        self.expiry_buckets: dict[str, dict[str, Any]] = {name: cfg.copy() for name, cfg in EXPIRY_BUCKETS.items()}
 
         # Days of week (0=Monday) to always send summary notifications
         self.summary_days: set[int] = SUMMARY_DAYS.copy()
@@ -77,15 +80,10 @@ class CertificateChecker:
     # --------------------------------------------------------------
 
     def authenticate(self) -> None:
-        """Authenticate using GitHub OIDC or client secret."""
+        """Authenticate using GitHub OIDC (CI) or client secret (local)."""
 
-        oidc_token = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
-        oidc_url = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL")
-
-        if oidc_token and oidc_url:
-            print("Using OIDC authentication (GitHub workload identity)")
-
-
+        # CI: workload identity via azure/login (no client secret)
+        if os.environ.get("GITHUB_ACTIONS"):
             az_proc: subprocess.CompletedProcess[str] = subprocess.run(
                 ["az", "account", "get-access-token", "--resource", "https://graph.microsoft.com"],
                 capture_output=True,
@@ -103,9 +101,7 @@ class CertificateChecker:
             app = msal.ConfidentialClientApplication(
                 self.client_id, authority=authority, client_credential=self.client_secret
             )
-            msal_result: dict[str, Any] = app.acquire_token_for_client(
-                scopes=["https://graph.microsoft.com/.default"]
-            )
+            msal_result: dict[str, Any] = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
 
             if "access_token" in msal_result:
                 self.access_token = msal_result["access_token"]
@@ -124,10 +120,7 @@ class CertificateChecker:
         headers = {"Authorization": f"Bearer {self.access_token}"}
         all_apps: list[dict[str, Any]] = []
 
-        url = (
-            f"{self.graph_endpoint}/applications"
-            f"?$select=displayName,appId,id,keyCredentials,passwordCredentials"
-        )
+        url = f"{self.graph_endpoint}/applications?$select=displayName,appId,id,keyCredentials,passwordCredentials"
 
         while url:
             response = requests.get(url, headers=headers, timeout=30)
@@ -158,6 +151,9 @@ class CertificateChecker:
             app_name = app.get("displayName")
             app_id = app.get("appId")
             object_id = app.get("id")
+            if not object_id or not app_id:
+                continue
+
             portal_link = self.build_app_registration_link(object_id, app_id)
 
             # Process both certificates and secrets
@@ -170,9 +166,7 @@ class CertificateChecker:
                     if not end_str:
                         continue
 
-                    expiry = datetime.fromisoformat(
-                        end_str.replace("Z", "+00:00")
-                    ).replace(tzinfo=None)
+                    expiry = datetime.fromisoformat(end_str.replace("Z", "+00:00")).replace(tzinfo=None)
                     delta = expiry - now
                     seconds = delta.total_seconds()
 
@@ -291,6 +285,7 @@ class CertificateChecker:
         except Exception as e:
             print(f"✗ Error: {e}")
             import traceback
+
             traceback.print_exc()
             sys.exit(1)
 

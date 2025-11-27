@@ -77,8 +77,8 @@ def format_cert_list(certs: list[dict[str, Any]]) -> str:
         date_str = expiry.strftime("%d-%m-%y")
         time_str = expiry.strftime("%H:%M")
 
-        when_full = _human_time_until(expiry)       # e.g. "in 57 days"
-        when_compact = _compact_when(when_full)     # e.g. "in 57d"
+        when_full = _human_time_until(expiry)  # e.g. "in 57 days"
+        when_compact = _compact_when(when_full)  # e.g. "in 57d"
 
         if portal_link:
             # Only the date part is clickable
