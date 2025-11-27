@@ -3,7 +3,7 @@ Slack notification module for certificate expiration alerts
 Formats and sends color-coded messages based on urgency levels
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import requests
@@ -19,7 +19,7 @@ def _human_time_until(expiry: datetime) -> str:
       - 'in 5 days'
       - 'in less than a minute'
     """
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     seconds = int((expiry - now).total_seconds())
 
     if seconds <= 0:
@@ -150,7 +150,7 @@ def build_slack_blocks(
                     "type": "mrkdwn",
                     "text": (
                         f"Certificate check | "
-                        f"{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} "
+                        f"{datetime.now(UTC).strftime('%Y-%m-%d %H:%M')} "
                         f"(all times in UTC - DD-MM-YY)"
                     ),
                 }

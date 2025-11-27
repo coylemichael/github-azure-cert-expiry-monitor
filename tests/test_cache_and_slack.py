@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -7,7 +7,7 @@ from slack_notifier import build_slack_blocks, format_cert_list, send_slack_noti
 
 
 def _fake_cert(app_name: str, days: int) -> dict:
-    expiry = datetime.utcnow() + timedelta(days=days)
+    expiry = datetime.now(UTC) + timedelta(days=days)
     return {
         "app_name": app_name,
         "app_id": "app-id",
@@ -55,7 +55,7 @@ def test_should_notify_on_today_tomorrow_and_changes(tmp_path, monkeypatch):
     cats = {"today": [], "tomorrow": [], "two_weeks": []}
     assert (
         cache.should_notify(
-            cats, {"new": [], "removed": [], "expiry_changed": []}, summary_days={datetime.utcnow().weekday()}
+            cats, {"new": [], "removed": [], "expiry_changed": []}, summary_days={datetime.now(UTC).weekday()}
         )
         is True
     )
@@ -63,10 +63,10 @@ def test_should_notify_on_today_tomorrow_and_changes(tmp_path, monkeypatch):
 
 def test_format_cert_list_and_blocks_render():
     """Slack formatting renders items and sections correctly."""
-    certs = [_fake_cert("app", 3)]
+    certs = [_fake_cert("app", 2)]
     text = format_cert_list(certs)
     assert "app" in text
-    assert "in 3" in text
+    assert "in 2" in text
 
     blocks = build_slack_blocks({"today": certs, "tomorrow": []})
     assert any(block.get("type") == "header" for block in blocks)

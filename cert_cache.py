@@ -4,7 +4,7 @@ Reduces API calls and enables change detection
 """
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -27,7 +27,7 @@ class CertificateCache:
 
     def save_cache(self) -> None:
         """Save cache to disk."""
-        self.cache["last_updated"] = datetime.utcnow().isoformat()
+        self.cache["last_updated"] = datetime.now(UTC).isoformat()
         with self.cache_file.open("w") as f:
             json.dump(self.cache, f, indent=2)
         print(f"✓ Cache saved to {self.cache_file}")
@@ -57,7 +57,7 @@ class CertificateCache:
                 "days_until_expiry": cert.get("days_until_expiry"),
                 "portal_link": cert.get("portal_link", ""),
                 "source": cert.get("source", ""),
-                "last_seen": datetime.utcnow().isoformat(),
+                "last_seen": datetime.now(UTC).isoformat(),
             }
 
         self.cache["certificates"] = cert_dict
@@ -125,7 +125,7 @@ class CertificateCache:
 
         # Scheduled summaries (defaults to Monday and Thursday)
         summary_day_set = set(summary_days) if summary_days else {0, 3}
-        if datetime.utcnow().weekday() in summary_day_set:
+        if datetime.now(UTC).weekday() in summary_day_set:
             return True
 
         return False
