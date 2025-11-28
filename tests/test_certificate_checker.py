@@ -93,9 +93,10 @@ def test_categorize_certificates_buckets_and_skips_expired(monkeypatch: MonkeyPa
     fixed_now = datetime(2025, 1, 1, 12, 0, tzinfo=UTC)
 
     class FixedDateTime(datetime):
-        @classmethod  # type: ignore[override]
-        def now(cls, tz: Any | None = None) -> datetime:
-            return fixed_now if tz else fixed_now.replace(tzinfo=None)
+        @classmethod
+        def now(cls, tz: Any | None = None) -> "FixedDateTime":
+            current = fixed_now if tz else fixed_now.replace(tzinfo=None)
+            return cast("FixedDateTime", current)
 
     monkeypatch.setattr("check_certificates.datetime", FixedDateTime)
 
