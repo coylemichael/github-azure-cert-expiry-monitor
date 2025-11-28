@@ -3,7 +3,7 @@ Slack notification module for certificate expiration alerts
 Formats and sends color-coded messages based on urgency levels
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 from typing import Any
 
 import requests
@@ -19,13 +19,10 @@ def _human_time_until(expiry: datetime) -> str:
       - 'in 5 days'
       - 'in less than a minute'
     """
-    if expiry.tzinfo is None:
-        expiry = expiry.replace(tzinfo=UTC)
-    else:
-        expiry = expiry.astimezone(UTC)
+    expiry_dt = _normalize_expiry(expiry)
 
     now = datetime.now(UTC)
-    seconds = int((expiry - now).total_seconds())
+    seconds = int((expiry_dt - now).total_seconds())
 
     if seconds <= 0:
         return "now"
@@ -64,6 +61,28 @@ def _compact_when(when: str) -> str:
     )
 
 
+def _normalize_expiry(expiry: Any) -> datetime:
+    """Coerce expiry into a timezone-aware UTC datetime."""
+    if isinstance(expiry, datetime):
+        if expiry.tzinfo is None:
+            return expiry.replace(tzinfo=UTC)
+        return expiry.astimezone(UTC)
+
+    if isinstance(expiry, str):
+        # Handle ISO strings with or without Z
+        iso = expiry.replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(iso)
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
+
+    if hasattr(expiry, "year") and hasattr(expiry, "month") and hasattr(expiry, "day"):
+        # date-like
+        return datetime.combine(expiry, time(0, 0), tzinfo=UTC)
+
+    raise TypeError(f"Unsupported expiry type: {type(expiry)}")
+
+
 def format_cert_list(certs: list[dict[str, Any]]) -> str:
     """Format certificate list for Slack message."""
     if not certs:
@@ -73,7 +92,7 @@ def format_cert_list(certs: list[dict[str, Any]]) -> str:
 
     for cert in certs[:MAX_SLACK_ITEMS]:
         app_name = cert["app_name"]
-        expiry: datetime = cert["expiry_date"]
+        expiry = _normalize_expiry(cert["expiry_date"])
         portal_link = cert.get("portal_link", "")
 
         # Date/time formatting:
