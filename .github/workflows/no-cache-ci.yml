@@ -1,0 +1,28 @@
+name: CI (no cache, lint only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Remove local certificate cache file
+        run: rm -f cert_cache.json
+
+      - name: Setup Python (no pip cache)
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Purge pip cache
+        run: python -m pip cache purge || true
+
+
