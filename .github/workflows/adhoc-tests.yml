@@ -19,7 +19,6 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-          cache: 'none' # ensure this run is independent of pip cache timing
 
       - name: Upgrade pip tooling
         run: python -m pip install --upgrade pip setuptools wheel
