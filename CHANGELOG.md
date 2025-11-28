@@ -5,17 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] - 2025-11-27
+
+### Added
+- Converted to `src/` layout with editable install for CLI/module entry.
+- Unit tests with coverage enabled in CI.
+- Dependabot setup for pip and GitHub Actions updates.
+- CODEOWNERS file recorded.
 
 ### Changed
 - Schedule simplified to workflow cron (Monday and Thursday 09:00 UTC); summary notifications follow the same days.
 - Bucket toggles are now hard-coded constants (no YAML configuration).
 - Slack links now open directly to the Credentials (Certificates & Secrets) blade in Azure.
 - CI authentication clarified to prefer OIDC/workload identity; client secret kept only for local runs.
-
-### Added
-- Dependabot setup for pip and GitHub Actions updates.
-- CODEOWNERS file recorded.
 
 ## [0.1.0] - 2025-11-20
 

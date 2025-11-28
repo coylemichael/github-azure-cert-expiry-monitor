@@ -127,7 +127,7 @@ def build_slack_blocks(
         return blocks
 
     urgent = bool(categories.get("today") or categories.get("tomorrow"))
-    icon = "🚨" if urgent else "⚠️"
+    icon = "🚨" if urgent else "🔔"
 
     # Header
     blocks.append(
@@ -172,7 +172,7 @@ def build_slack_blocks(
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*🔹 {label} ({len(certs)})*\n{format_cert_list(certs)}",
+                    "text": f"*• {label} ({len(certs)})*\n{format_cert_list(certs)}",
                 },
             }
         )
@@ -210,7 +210,7 @@ def send_slack_notification(
     try:
         response = requests.post(webhook_url, json=payload, timeout=10)
         response.raise_for_status()
-        print("✓ Successfully sent Slack notification")
+        print("✅ Successfully sent Slack notification")
     except requests.exceptions.RequestException as e:
-        print(f"✗ Failed to send Slack notification: {str(e)}")
+        print(f"⚠ Failed to send Slack notification: {str(e)}")
         raise

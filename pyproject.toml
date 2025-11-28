@@ -73,3 +73,15 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "msal.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["check_certificates", "cert_cache", "slack_notifier"]
