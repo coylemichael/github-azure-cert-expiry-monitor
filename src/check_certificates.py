@@ -138,7 +138,7 @@ class CertificateChecker:
 
     def categorize_certificates(self, apps: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
         # Use timezone-aware UTC, then strip tzinfo for arithmetic
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC)
         today = now.date()
         tomorrow_date = today + timedelta(days=1)
 
@@ -166,7 +166,7 @@ class CertificateChecker:
                     if not end_str:
                         continue
 
-                    expiry = datetime.fromisoformat(end_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                    expiry = datetime.fromisoformat(end_str.replace("Z", "+00:00")).astimezone(UTC)
                     delta = expiry - now
                     seconds = delta.total_seconds()
 
