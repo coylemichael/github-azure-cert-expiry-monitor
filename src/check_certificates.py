@@ -265,7 +265,6 @@ class CertificateChecker:
             print("=" * 60)
 
             # -------------------------------------------------
-            # IMPORTANT FIX:
             # Update cache BEFORE sending Slack alerts
             # -------------------------------------------------
             self.cache.update_certificates(all_certs)
@@ -290,5 +289,9 @@ class CertificateChecker:
             sys.exit(1)
 
 
-if __name__ == "__main__":
+def main() -> None:
     CertificateChecker().run()
+
+
+if __name__ == "__main__":
+    main()

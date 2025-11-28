@@ -22,7 +22,7 @@ class CertificateCache:
                     data: dict[str, Any] = json.load(f)
                     return data
             except (json.JSONDecodeError, OSError) as e:
-                print(f"⚠ Warning: Could not load cache: {e}")
+                print(f"? Warning: Could not load cache: {e}")
         return {"last_updated": None, "certificates": {}}
 
     def save_cache(self) -> None:
@@ -30,7 +30,7 @@ class CertificateCache:
         self.cache["last_updated"] = datetime.now(UTC).isoformat()
         with self.cache_file.open("w") as f:
             json.dump(self.cache, f, indent=2)
-        print(f"✓ Cache saved to {self.cache_file}")
+        print(f"� Cache saved to {self.cache_file}")
 
     def get_certificate_key(self, cert_info: dict[str, Any]) -> str:
         """Generate unique key for certificate."""

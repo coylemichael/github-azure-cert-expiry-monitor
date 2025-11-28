@@ -9,7 +9,7 @@ Auth paths:
 - CI: `azure/login` with OIDC/workload identity (no client secret needed).
 - Local: client secret from `.env` is used if present.
 
-Buckets and schedule are code constants in `check_certificates.py`:
+Buckets and schedule are code constants in `src/check_certificates.py`:
 ```python
 SUMMARY_DAYS = {0, 3}  # Monday, Thursday
 EXPIRY_BUCKETS = {
@@ -32,7 +32,9 @@ Edit these to change cadence or buckets. `cert_cache.json` tracks changes to cut
 ## Run locally
 ```bash
 pip install -r requirements.txt
-python check_certificates.py
+pip install -e .
+python -m pytest  # optional
+python -m check_certificates
 ```
 
 ## GitHub Actions
