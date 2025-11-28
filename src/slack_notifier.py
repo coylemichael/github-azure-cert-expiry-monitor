@@ -132,7 +132,7 @@ def build_slack_blocks(
     blocks.append(
         {
             "type": "header",
-            "text": {"type": "plain_text", "text": f"{icon}: Azure Certificate Expiration Alert", "emoji": False},
+            "text": {"type": "plain_text", "text": f"{icon} Azure Certificate Expiration Alert", "emoji": False},
         }
     )
 
