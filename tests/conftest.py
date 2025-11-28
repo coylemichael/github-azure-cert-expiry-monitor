@@ -12,6 +12,6 @@ if str(SRC) not in sys.path:
 
 
 @pytest.fixture(autouse=True)
-def _ensure_src_path() -> Generator[None, None, None]:
+def _ensure_src_path() -> Generator[None]:
     """No-op fixture to keep autouse in place."""
     yield
