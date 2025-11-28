@@ -7,12 +7,13 @@ Key goals:
 - Keep messages compact while still readable in Slack.
 """
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 import requests
 
-UTC = timezone.utc
+UTC = UTC
+
 MAX_SLACK_ITEMS = 10
 
 
@@ -92,10 +93,7 @@ def format_cert_list(certs: list[dict[str, Any]]) -> str:
             date_link = f"<{portal_link}|{date_str}>" if portal_link else date_str
             lines.append(f"[`{app_name}`] | {when_compact} | {date_link} - {time_str}")
         except Exception as exc:  # pragma: no cover - defensive
-            print(
-                f"Skipping item due to expiry parse error: app={app_name!r} "
-                f"expiry={expiry_raw!r} error={exc!r}"
-            )
+            print(f"Skipping item due to expiry parse error: app={app_name!r} " f"expiry={expiry_raw!r} error={exc!r}")
             lines.append(f"[`{app_name}`] | (invalid expiry)")
 
     if len(certs) > MAX_SLACK_ITEMS:
