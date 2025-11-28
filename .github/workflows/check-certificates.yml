@@ -48,6 +48,9 @@ jobs:
           restore-keys: |
             cert-cache-
 
+      - name: Remove existing cert_cache.json (fresh run)
+        run: rm -f cert_cache.json
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

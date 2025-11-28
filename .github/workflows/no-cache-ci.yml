@@ -1,4 +1,4 @@
-name: CI (no cache, lint only)
+name: Certificate Check (no cache)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ permissions:
   pull-requests: read
 
 jobs:
-  lint:
+  run-check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,4 +25,18 @@ jobs:
       - name: Purge pip cache
         run: python -m pip cache purge || true
 
+      - name: Upgrade pip tooling
+        run: python -m pip install --upgrade pip setuptools wheel
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Run certificate check (fresh, no cache)
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python -m check_certificates
 
