@@ -5,10 +5,10 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+  id-token: write
 
 jobs:
-  run-check:
+  no-cache-run:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -17,26 +17,27 @@ jobs:
       - name: Remove local certificate cache file
         run: rm -f cert_cache.json
 
-      - name: Setup Python (no pip cache)
+      - name: Azure OIDC Login (Workload Identity)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Setup Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.13'
 
-      - name: Purge pip cache
-        run: python -m pip cache purge || true
-
-      - name: Upgrade pip tooling
-        run: python -m pip install --upgrade pip setuptools wheel
-
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -e .
 
-      - name: Run certificate check (fresh, no cache)
+      - name: Run certificate check (fresh)
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: python -m check_certificates
-

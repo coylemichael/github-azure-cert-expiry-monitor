@@ -3,19 +3,19 @@ name: Certificate Expiry Check
 on:
   schedule:
     # Run every Monday and Thursday at 9:00 AM UTC
-    - cron: '0 9 * * 1'
-    - cron: '0 9 * * 4'
-  workflow_dispatch:  # Manual trigger for testing
+    - cron: "0 9 * * 1"
+    - cron: "0 9 * * 4"
+  workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write  # Required for OIDC
+  id-token: write
 
 jobs:
   check-certificates:
     name: Check Azure Certificate Expiration
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -30,7 +30,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: "3.13"
 
       - name: Cache pip
         uses: actions/cache@v4
