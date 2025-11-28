@@ -29,7 +29,7 @@ def _to_utc_aware(dt: Any) -> datetime:
             s = s[:-1] + "+00:00"
         d = datetime.fromisoformat(s)
     else:
-        raise TypeError(f"expiry must be datetime|date|ISO string, got: {type(dt)!r}")
+        raise TypeError(f"expiry must be datetime-date-ISO string, got: {type(dt)!r}")
 
     if d.tzinfo is None or d.utcoffset() is None:
         return d.replace(tzinfo=UTC)
@@ -90,11 +90,11 @@ def format_cert_list(certs: list[dict[str, Any]]) -> str:
             time_str = expiry_dt.strftime("%H:%M")
             when_full = _human_time_until(expiry_dt)
             when_compact = _compact_when(when_full)
-            date_link = f"<{portal_link}|{date_str}>" if portal_link else date_str
-            lines.append(f"[`{app_name}`] | {when_compact} | {date_link} - {time_str}")
+            date_link = f"<{portal_link}-{date_str}>" if portal_link else date_str
+            lines.append(f"[`{app_name}`] - {when_compact} - {date_link} - {time_str}")
         except Exception as exc:  # pragma: no cover - defensive
             print(f"Skipping item due to expiry parse error: app={app_name!r} " f"expiry={expiry_raw!r} error={exc!r}")
-            lines.append(f"[`{app_name}`] | (invalid expiry)")
+            lines.append(f"[`{app_name}`] - (invalid expiry)")
 
     if len(certs) > MAX_SLACK_ITEMS:
         lines.append(f"_...and {len(certs) - MAX_SLACK_ITEMS} more_")
@@ -127,7 +127,7 @@ def build_slack_blocks(
         )
         return blocks
 
-    icon = "ALERT" if (categories.get("today") or categories.get("tomorrow")) else "NOTICE"
+    icon = "ALERT" if (categories.get("today") or categories.get("tomorrow")) else ":rotating_light:"
 
     blocks.append(
         {
@@ -143,7 +143,7 @@ def build_slack_blocks(
                 {
                     "type": "mrkdwn",
                     "text": (
-                        f"Certificate check | "
+                        f"Certificate check - "
                         f"{datetime.now(UTC).strftime('%Y-%m-%d %H:%M')} "
                         f"(all times in UTC - DD-MM-YY)"
                     ),
