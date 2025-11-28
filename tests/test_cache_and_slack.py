@@ -1,13 +1,16 @@
 import re
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 import pytest
+from pytest import MonkeyPatch
 
 from cert_cache import CertificateCache
 from slack_notifier import build_slack_blocks, format_cert_list, send_slack_notification
 
 
-def _fake_cert(app_name: str, days: int) -> dict:
+def _fake_cert(app_name: str, days: int) -> dict[str, Any]:
     expiry = datetime.now(UTC) + timedelta(days=days)
     return {
         "app_name": app_name,
@@ -22,7 +25,7 @@ def _fake_cert(app_name: str, days: int) -> dict:
     }
 
 
-def test_cache_detects_new_removed_changed(tmp_path, monkeypatch):
+def test_cache_detects_new_removed_changed(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     """Cache diffing: finds new, removed, and expiry-changed certs."""
     monkeypatch.chdir(tmp_path)
     cache = CertificateCache()
@@ -40,7 +43,7 @@ def test_cache_detects_new_removed_changed(tmp_path, monkeypatch):
     assert len(changes["expiry_changed"]) == 1  # one
 
 
-def test_should_notify_on_today_tomorrow_and_changes(tmp_path, monkeypatch):
+def test_should_notify_on_today_tomorrow_and_changes(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     """Notify when critical buckets or structural changes occur."""
     monkeypatch.chdir(tmp_path)
     cache = CertificateCache()
@@ -62,7 +65,7 @@ def test_should_notify_on_today_tomorrow_and_changes(tmp_path, monkeypatch):
     )
 
 
-def test_format_cert_list_and_blocks_render():
+def test_format_cert_list_and_blocks_render() -> None:
     """Slack formatting renders items and sections correctly."""
     certs = [_fake_cert("app", 1)]
     text = format_cert_list(certs)
@@ -76,32 +79,32 @@ def test_format_cert_list_and_blocks_render():
     )
 
 
-def test_should_notify_false_when_no_triggers_not_summary(tmp_path, monkeypatch):
+def test_should_notify_false_when_no_triggers_not_summary(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     """No critical items and not a summary day should suppress alerts."""
     monkeypatch.chdir(tmp_path)
     cache = CertificateCache()
-    cats = {"today": [], "tomorrow": [], "two_weeks": []}
-    changes = {"new": [], "removed": [], "expiry_changed": []}
+    cats: dict[str, list[dict[str, Any]]] = {"today": [], "tomorrow": [], "two_weeks": []}
+    changes: dict[str, list[dict[str, Any]]] = {"new": [], "removed": [], "expiry_changed": []}
     # Sunday (6) not in default summary days {0,3}
     assert cache.should_notify(cats, changes, summary_days={6}) is False
 
 
-def test_build_slack_blocks_all_clear():
+def test_build_slack_blocks_all_clear() -> None:
     """All-clear state produces a clear header message."""
     blocks = build_slack_blocks({"today": [], "tomorrow": []})
     header = next((b for b in blocks if b.get("type") == "header"), {})
     assert "All Clear" in header.get("text", {}).get("text", "")
 
 
-def test_send_slack_notification_sets_color(monkeypatch):
+def test_send_slack_notification_sets_color(monkeypatch: MonkeyPatch) -> None:
     """Slack payload color matches urgency across buckets."""
-    captured = {}
+    captured: dict[str, Any] = {}
 
-    def fake_post(url, json=None, timeout=None):
+    def fake_post(url: str, json: Any = None, timeout: int | float | None = None) -> Any:
         captured["payload"] = json
 
         class Resp:
-            def raise_for_status(self):
+            def raise_for_status(self) -> None:
                 return None
 
         return Resp()
@@ -112,26 +115,30 @@ def test_send_slack_notification_sets_color(monkeypatch):
     send_slack_notification(cats, "https://example.com/hook", changes=None)
     assert captured["payload"]["attachments"][0]["color"] == "danger"
 
-    cats_warning = {"today": [], "tomorrow": [], "forty_eight_hours": [_fake_cert("one", 2)]}
+    cats_warning: dict[str, list[dict[str, Any]]] = {
+        "today": [],
+        "tomorrow": [],
+        "forty_eight_hours": [_fake_cert("one", 2)],
+    }
     send_slack_notification(cats_warning, "https://example.com/hook", changes=None)
     assert captured["payload"]["attachments"][0]["color"] == "warning"
 
-    cats_good = {"today": [], "tomorrow": [], "forty_eight_hours": []}
+    cats_good: dict[str, list[dict[str, Any]]] = {"today": [], "tomorrow": [], "forty_eight_hours": []}
     send_slack_notification(cats_good, "https://example.com/hook", changes=None)
     assert captured["payload"]["attachments"][0]["color"] == "good"
 
 
-def test_send_slack_notification_propagates_errors(monkeypatch):
+def test_send_slack_notification_propagates_errors(monkeypatch: MonkeyPatch) -> None:
     """Slack HTTP errors should bubble up to fail the run."""
 
     class Boom(Exception):
         pass
 
-    def fake_post(url, json=None, timeout=None):
+    def fake_post(url: str, json: Any = None, timeout: int | float | None = None) -> Any:
         raise Boom("fail")
 
     monkeypatch.setattr("slack_notifier.requests.post", fake_post)
 
-    cats = {"today": [], "tomorrow": [], "forty_eight_hours": []}
+    cats: dict[str, list[dict[str, Any]]] = {"today": [], "tomorrow": [], "forty_eight_hours": []}
     with pytest.raises(Boom):
         send_slack_notification(cats, "https://example.com/hook", changes=None)

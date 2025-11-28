@@ -9,12 +9,17 @@ echo "Running ruff lint check..."
 ruff check . || exit 1
 
 echo "Running mypy type check..."
-python -m mypy *.py || exit 1
+python -m mypy src tests || exit 1
 
 echo "Running tests with coverage..."
-# Write coverage data to a temp location to avoid OneDrive/ACL issues
-export COVERAGE_FILE="${TMP:-/tmp}/.coverage"
-python -m pytest --cov --cov-report=term --cov-config=pyproject.toml || exit 1
+# Use a fixed temp away from OneDrive (Git Bash path style)
+export TMPDIR="/c/Temp/pytest"
+mkdir -p "$TMPDIR"
+export TMP="$TMPDIR"
+export TEMP="$TMPDIR"
+export COVERAGE_FILE="$TMPDIR/.coverage"
+export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
+python -m pytest --basetemp "$TMPDIR" --cov --cov-report=term --cov-config=pyproject.toml || exit 1
 
 echo ""
 echo "All CI checks passed! Committing..."

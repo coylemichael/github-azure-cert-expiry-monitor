@@ -29,7 +29,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --strict-markers"
+addopts = "-v --strict-markers --basetemp=C:/Temp/pytest"
 
 [tool.ruff]
 line-length = 120
@@ -73,3 +73,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "msal.*"
 ignore_missing_imports = true
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["check_certificates", "cert_cache", "slack_notifier"]

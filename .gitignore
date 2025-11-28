@@ -14,6 +14,8 @@ ENV/
 
 # Certificate cache
 cert_cache.json
+.coverage*
+.tmp/
 
 # Organization-specific
 .github/workflows/security.yml
