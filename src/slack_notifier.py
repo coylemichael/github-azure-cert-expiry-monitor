@@ -19,6 +19,11 @@ def _human_time_until(expiry: datetime) -> str:
       - 'in 5 days'
       - 'in less than a minute'
     """
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=UTC)
+    else:
+        expiry = expiry.astimezone(UTC)
+
     now = datetime.now(UTC)
     seconds = int((expiry - now).total_seconds())
 
