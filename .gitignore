@@ -8,6 +8,7 @@ env/
 venv/
 ENV/
 .venv
+*.egg-info/
 
 # Environment variables
 .env
@@ -25,6 +26,9 @@ cert_cache.json
 .idea/
 *.swp
 *.swo
+
+# Working notes
+drift/
 
 # OS
 .DS_Store

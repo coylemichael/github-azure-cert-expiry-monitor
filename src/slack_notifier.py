@@ -63,6 +63,29 @@ def _human_time_until(expiry: Any) -> str:
     return "in less than a minute"
 
 
+def _human_time_since(expiry: Any) -> str:
+    """Human-readable time since expiry (for recently expired items)."""
+    expiry_dt = _to_utc_aware(expiry)
+    now = datetime.now(UTC)
+
+    seconds = int((now - expiry_dt).total_seconds())
+    if seconds <= 0:
+        return "just now"
+
+    days, rem = divmod(seconds, 86400)
+    hours, _ = divmod(rem, 3600)
+
+    if days > 1:
+        return f"{days} days ago"
+    if days == 1:
+        return "1 day ago"
+    if hours > 1:
+        return f"{hours} hours ago"
+    if hours == 1:
+        return "1 hour ago"
+    return "less than an hour ago"
+
+
 def _compact_when(when: str) -> str:
     return (
         when.replace(" days", "d")
@@ -74,7 +97,7 @@ def _compact_when(when: str) -> str:
     )
 
 
-def format_cert_list(certs: list[dict[str, Any]]) -> str:
+def format_cert_list(certs: list[dict[str, Any]], is_expired: bool = False) -> str:
     if not certs:
         return "_None_"
 
@@ -88,10 +111,15 @@ def format_cert_list(certs: list[dict[str, Any]]) -> str:
             expiry_dt = _to_utc_aware(expiry_raw)
             date_str = expiry_dt.strftime("%d-%m-%y")
             time_str = expiry_dt.strftime("%H:%M")
-            when_full = _human_time_until(expiry_dt)
-            when_compact = _compact_when(when_full)
+            if is_expired:
+                when_full = _human_time_since(expiry_dt)
+                when_compact = _compact_when(when_full)
+            else:
+                when_full = _human_time_until(expiry_dt)
+                when_compact = _compact_when(when_full)
             date_link = f"<{portal_link}|{date_str}>" if portal_link else date_str
-            lines.append(f"[`{app_name}`] · {when_compact} · {date_link} · {time_str}")
+            type_icon = "📜" if cert.get("type") == "Certificate" else "🔑"
+            lines.append(f"{type_icon} [`{app_name}`] · {when_compact} · {date_link} · {time_str}")
         except Exception as exc:  # pragma: no cover - defensive
             print(f"Skipping item due to expiry parse error: app={app_name!r} " f"expiry={expiry_raw!r} error={exc!r}")
             lines.append(f"[`{app_name}`] · (invalid expiry)")
@@ -104,7 +132,6 @@ def format_cert_list(certs: list[dict[str, Any]]) -> str:
 
 def build_slack_blocks(
     categories: dict[str, list[dict[str, Any]]],
-    changes: dict[str, list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
     blocks: list[dict[str, Any]] = []
 
@@ -113,7 +140,7 @@ def build_slack_blocks(
         blocks.append(
             {
                 "type": "header",
-                "text": {"type": "plain_text", "text": "Certificate Status: All Clear", "emoji": False},
+                "text": {"type": "plain_text", "text": "Credential Status: All Clear", "emoji": False},
             }
         )
         blocks.append(
@@ -121,18 +148,20 @@ def build_slack_blocks(
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "No certificates are expiring within the configured time windows.",
+                    "text": "No credentials are expiring within the configured time windows.",
                 },
             }
         )
         return blocks
 
-    icon = "🚨" if (categories.get("today") or categories.get("tomorrow")) else "🔔"
+    icon = (
+        "🚨" if (categories.get("recently_expired") or categories.get("today") or categories.get("tomorrow")) else "🔔"
+    )
 
     blocks.append(
         {
             "type": "header",
-            "text": {"type": "plain_text", "text": f"{icon} Azure Certificate Expiration Alert", "emoji": False},
+            "text": {"type": "plain_text", "text": f"{icon} Azure Credential Expiration Alert", "emoji": False},
         }
     )
 
@@ -143,9 +172,9 @@ def build_slack_blocks(
                 {
                     "type": "mrkdwn",
                     "text": (
-                        f"Certificate check - "
+                        f"Credential check - "
                         f"{datetime.now(UTC).strftime('%Y-%m-%d %H:%M')} "
-                        f"(all times in UTC - DD-MM-YY)"
+                        f"(all times in UTC - DD-MM-YY) · 🔑 = Secret · 📜 = Certificate"
                     ),
                 }
             ],
@@ -158,13 +187,14 @@ def build_slack_blocks(
         if not certs:
             continue
 
-        label = bucket_name.replace("_", " ").title()
+        is_expired = bucket_name == "recently_expired"
+        label = "Expired Within Last 30 Days" if is_expired else bucket_name.replace("_", " ").title()
         blocks.append(
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"* {label} ({len(certs)})*\n{format_cert_list(certs)}",
+                    "text": f"* {label} ({len(certs)})*\n{format_cert_list(certs, is_expired=is_expired)}",
                 },
             }
         )
@@ -176,11 +206,10 @@ def build_slack_blocks(
 def send_slack_notification(
     categories: dict[str, list[dict[str, Any]]],
     webhook_url: str,
-    changes: dict[str, list[dict[str, Any]]] | None = None,
 ) -> None:
-    blocks = build_slack_blocks(categories, changes)
+    blocks = build_slack_blocks(categories)
 
-    if categories.get("today") or categories.get("tomorrow"):
+    if categories.get("recently_expired") or categories.get("today") or categories.get("tomorrow"):
         color = "danger"
     elif categories.get("forty_eight_hours") or categories.get("two_weeks"):
         color = "warning"
@@ -192,7 +221,7 @@ def send_slack_notification(
         "attachments": [
             {
                 "color": color,
-                "fallback": f"Certificate expiration alert: {sum(len(v) for v in categories.values())} items need attention",
+                "fallback": f"Credential expiration alert: {sum(len(v) for v in categories.values())} items need attention",
             }
         ],
     }

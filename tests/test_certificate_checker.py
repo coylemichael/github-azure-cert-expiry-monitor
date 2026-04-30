@@ -2,19 +2,12 @@ import json
 import subprocess
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any, cast
 
 import pytest
 from pytest import MonkeyPatch
 
 from check_certificates import EXPIRY_BUCKETS, SUMMARY_DAYS, CertificateChecker
-
-
-@pytest.fixture(autouse=True)
-def _chdir_tmp(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
-    """Run tests in an isolated temp directory to avoid touching real cache files."""
-    monkeypatch.chdir(tmp_path)
 
 
 @pytest.fixture(autouse=True)
@@ -88,7 +81,7 @@ def test_authenticate_raises_when_no_auth_available(monkeypatch: MonkeyPatch) ->
 
 
 def test_categorize_certificates_buckets_and_skips_expired(monkeypatch: MonkeyPatch) -> None:
-    """Bucket math: correct placement and expired items dropped."""
+    """Bucket math: correct placement and old expired items dropped."""
     # Fixed "now" so bucket math is deterministic
     fixed_now = datetime(2025, 1, 1, 12, 0, tzinfo=UTC)
 
@@ -114,7 +107,8 @@ def test_categorize_certificates_buckets_and_skips_expired(monkeypatch: MonkeyPa
                 {"keyId": "k3", "endDateTime": iso_in(2)},  # forty_eight_hours
                 {"keyId": "k4", "endDateTime": iso_in(10)},  # two_weeks
                 {"keyId": "k5", "endDateTime": iso_in(25)},  # one_month
-                {"keyId": "k6", "endDateTime": iso_in(-1)},  # expired -> skipped
+                {"keyId": "k6", "endDateTime": iso_in(-5)},  # recently expired
+                {"keyId": "k7", "endDateTime": iso_in(-60)},  # expired too long ago -> skipped
             ],
             "passwordCredentials": [],
         }
@@ -128,7 +122,10 @@ def test_categorize_certificates_buckets_and_skips_expired(monkeypatch: MonkeyPa
     assert len(categories["forty_eight_hours"]) == 1
     assert len(categories["two_weeks"]) == 1
     assert len(categories["one_month"]) == 1
-    assert all("k6" not in c["key_id"] for bucket in categories.values() for c in bucket)
+    assert len(categories["recently_expired"]) == 1
+    assert categories["recently_expired"][0]["key_id"] == "k6"
+    # k7 expired more than 30 days ago, should not appear anywhere
+    assert all("k7" not in c["key_id"] for bucket in categories.values() for c in bucket)
 
 
 def test_portal_link_points_to_credentials_blade() -> None:
@@ -141,87 +138,49 @@ def test_portal_link_points_to_credentials_blade() -> None:
 
 
 def test_run_no_notification(monkeypatch: MonkeyPatch) -> None:
-    """Run path: no notify when nothing triggers; still updates cache."""
+    """Run path: no notify when nothing triggers; Slack not called."""
     # Environment already set by fixture
     checker = CertificateChecker()
 
     monkeypatch.setattr(checker, "authenticate", lambda: None)
     monkeypatch.setattr(checker, "get_app_registrations", lambda: [])
-    monkeypatch.setattr(checker, "categorize_certificates", lambda apps: {"today": [], "tomorrow": [], "two_weeks": []})
+    monkeypatch.setattr(
+        checker,
+        "categorize_certificates",
+        lambda apps: {"recently_expired": [], "today": [], "tomorrow": [], "two_weeks": []},
+    )
+    monkeypatch.setattr(checker, "should_notify", lambda cats: False)
 
     calls: dict[str, Any] = {}
-
-    class FakeCache:
-        def get_changes(self, all_certs: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-            calls["get_changes"] = True
-            return {"new": [], "removed": [], "expiry_changed": []}
-
-        def update_certificates(self, all_certs: list[dict[str, Any]]) -> None:
-            calls["update"] = True
-
-        def save_cache(self) -> None:
-            calls["save"] = True
-
-        def should_notify(
-            self,
-            categories: dict[str, list[dict[str, Any]]],
-            changes: dict[str, list[dict[str, Any]]],
-            summary_days: Any = None,
-        ) -> bool:
-            calls["should_notify"] = True
-            return False
-
-    checker.cache = cast(Any, FakeCache())
     monkeypatch.setattr(
         "check_certificates.send_slack_notification", lambda *args, **kwargs: calls.setdefault("slack", True)
     )
 
     checker.run()
 
-    assert calls.get("get_changes")
-    assert calls.get("update")
-    assert calls.get("save")
-    assert calls.get("should_notify")
     assert "slack" not in calls
 
 
 def test_run_with_notification(monkeypatch: MonkeyPatch) -> None:
-    """Run path: when notify is True, Slack is called and cache saved."""
+    """Run path: when notify is True, Slack is called."""
     checker = CertificateChecker()
 
     monkeypatch.setattr(checker, "authenticate", lambda: None)
     monkeypatch.setattr(checker, "get_app_registrations", lambda: [])
-    monkeypatch.setattr(checker, "categorize_certificates", lambda apps: {"today": [], "tomorrow": [], "two_weeks": []})
+    monkeypatch.setattr(
+        checker,
+        "categorize_certificates",
+        lambda apps: {"recently_expired": [], "today": [], "tomorrow": [], "two_weeks": []},
+    )
+    monkeypatch.setattr(checker, "should_notify", lambda cats: True)
 
     calls: dict[str, Any] = {}
-
-    class FakeCache:
-        def get_changes(self, all_certs: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-            return {"new": [], "removed": [], "expiry_changed": []}
-
-        def update_certificates(self, all_certs: list[dict[str, Any]]) -> None:
-            calls["update"] = True
-
-        def save_cache(self) -> None:
-            calls["save"] = True
-
-        def should_notify(
-            self,
-            categories: dict[str, list[dict[str, Any]]],
-            changes: dict[str, list[dict[str, Any]]],
-            summary_days: Any = None,
-        ) -> bool:
-            return True
-
-    checker.cache = cast(Any, FakeCache())
     monkeypatch.setattr(
         "check_certificates.send_slack_notification", lambda *args, **kwargs: calls.setdefault("slack", True)
     )
 
     checker.run()
 
-    assert calls.get("update")
-    assert calls.get("save")
     assert calls.get("slack")
 
 
@@ -251,5 +210,34 @@ def test_run_bubbles_exit_on_error(monkeypatch: MonkeyPatch) -> None:
 def test_constants_guardrails() -> None:
     """Protect default cadence/bucket switches from accidental edits."""
     assert SUMMARY_DAYS == {0, 3}
+    assert EXPIRY_BUCKETS["recently_expired"]["enabled"] is True
+    assert EXPIRY_BUCKETS["recently_expired"]["days"] == -30
     assert EXPIRY_BUCKETS["today"]["enabled"] is True
     assert EXPIRY_BUCKETS["six_months"]["enabled"] is False
+
+
+def test_should_notify_true_when_items_exist(monkeypatch: MonkeyPatch) -> None:
+    """Notify when any bucket has items."""
+    checker = CertificateChecker()
+    cats: dict[str, list[dict[str, Any]]] = {
+        "recently_expired": [{"app_name": "test"}],
+        "today": [],
+        "tomorrow": [],
+    }
+    assert checker.should_notify(cats) is True
+
+
+def test_should_notify_true_on_summary_day(monkeypatch: MonkeyPatch) -> None:
+    """Notify on scheduled summary days even with empty buckets."""
+    checker = CertificateChecker()
+    checker.summary_days = {datetime.now(UTC).weekday()}  # force today to be a summary day
+    cats: dict[str, list[dict[str, Any]]] = {"recently_expired": [], "today": [], "tomorrow": []}
+    assert checker.should_notify(cats) is True
+
+
+def test_should_notify_false_when_empty_not_summary_day(monkeypatch: MonkeyPatch) -> None:
+    """No items and not a summary day should suppress."""
+    checker = CertificateChecker()
+    checker.summary_days = set()  # no summary days
+    cats: dict[str, list[dict[str, Any]]] = {"recently_expired": [], "today": [], "tomorrow": []}
+    assert checker.should_notify(cats) is False

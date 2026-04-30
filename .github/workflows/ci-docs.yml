@@ -1,0 +1,30 @@
+name: CI (non-code)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'docs/**'
+      - '.github/**'
+      - 'drift/**'
+    paths-ignore:
+      - 'src/**'
+      - 'tests/**'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  system_tests:
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    permissions:
+      contents: read
+      checks: write
+    uses: accelins/rx-common-github/.github/workflows/system-tests.yaml@main
+    with:
+      success: true

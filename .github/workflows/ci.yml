@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
   pull-requests: read
 
 jobs:
@@ -49,3 +50,13 @@ jobs:
           pytest --cov=. --cov-report=xml --cov-report=term-missing --cov-fail-under=80 -q
         env:
           PYTHONPATH: ${{ github.workspace }}
+
+  system_tests:
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    needs: [lint-and-test]
+    permissions:
+      contents: read
+      checks: write
+    uses: accelins/rx-common-github/.github/workflows/system-tests.yaml@main
+    with:
+      success: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}

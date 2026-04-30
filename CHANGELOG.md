@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-04-29
+
+### Added
+- "Recently Expired" bucket — credentials expired within the last 30 days are now reported instead of silently ignored.
+- Credential type icons in Slack output — 🔑 for secrets, 📜 for certificates — with a legend in the message header.
+- `_human_time_since()` in Slack notifier for "X days ago" formatting on expired items.
+- `should_notify()` method on `CertificateChecker` — simple stateless logic (any items or summary day).
+- Dev Slack webhook support via `.env` for safe local testing.
+- `system_tests` job in CI workflow — satisfies org-wide universal test check requirement.
+- `ci-docs.yml` bypass workflow for non-code PRs (README, docs, `.github` changes only).
+
+### Changed
+- Slack messages renamed from "Certificate" to "Credential" to accurately cover both certificates and client secrets.
+- Notification logic is now fully stateless — each run is a live snapshot from Azure with no local persistence.
+- Simplified GitHub Actions workflow: removed cache restore/save/delete steps and artifact upload.
+
+### Removed
+- `cert_cache.py` — certificate cache module and all change-detection logic.
+- `no-cache-ci.yml` workflow — redundant now that the main workflow is stateless.
+
 ## [1.0.0] - 2025-11-27
 
 ### Added

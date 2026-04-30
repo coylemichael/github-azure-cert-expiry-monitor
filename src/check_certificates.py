@@ -16,7 +16,6 @@ import msal
 import requests
 from dotenv import load_dotenv
 
-from cert_cache import CertificateCache
 from slack_notifier import send_slack_notification
 
 load_dotenv()
@@ -26,6 +25,7 @@ load_dotenv()
 # --------------------------------------------------------------
 SUMMARY_DAYS: set[int] = {0, 3}  # Monday, Thursday
 EXPIRY_BUCKETS: dict[str, dict[str, Any]] = {
+    "recently_expired": {"days": -30, "enabled": True},  # expired within last 30 days
     "today": {"days": None, "enabled": True},  # same UTC calendar day
     "tomorrow": {"days": None, "enabled": True},  # next UTC calendar day
     "forty_eight_hours": {"days": 2, "enabled": True},
@@ -54,7 +54,6 @@ class CertificateChecker:
 
         self.graph_endpoint = "https://graph.microsoft.com/v1.0"
         self.access_token: str | None = None
-        self.cache = CertificateCache()
 
         # Bucket definitions: "days" is None for date-based buckets.
         self.expiry_buckets: dict[str, dict[str, Any]] = {name: cfg.copy() for name, cfg in EXPIRY_BUCKETS.items()}
@@ -169,11 +168,6 @@ class CertificateChecker:
                     expiry = datetime.fromisoformat(end_str.replace("Z", "+00:00")).astimezone(UTC)
                     delta = expiry - now
                     seconds = delta.total_seconds()
-
-                    # Ignore already-expired creds (no "expired" bucket)
-                    if seconds <= 0:
-                        continue
-
                     delta_days = seconds / 86400.0
                     expiry_date = expiry.date()
 
@@ -188,6 +182,19 @@ class CertificateChecker:
                         "portal_link": portal_link,
                         "source": "AppRegistration",
                     }
+
+                    # ---------------------------
+                    # RECENTLY EXPIRED (within last 30 days)
+                    # ---------------------------
+                    if seconds <= 0:
+                        recently_expired_cfg = self.expiry_buckets.get("recently_expired", {})
+                        if (
+                            recently_expired_cfg.get("enabled")
+                            and "recently_expired" in categories
+                            and delta_days >= recently_expired_cfg["days"]
+                        ):
+                            categories["recently_expired"].append(cert_info)
+                        continue
 
                     # ---------------------------
                     # TODAY (same UTC calendar date)
@@ -218,7 +225,7 @@ class CertificateChecker:
                     for bucket_name, cfg in self.expiry_buckets.items():
                         if not cfg.get("enabled"):
                             continue
-                        if bucket_name in ("today", "tomorrow"):
+                        if bucket_name in ("today", "tomorrow", "recently_expired"):
                             continue  # handled above
 
                         limit_days = cfg["days"]
@@ -231,6 +238,12 @@ class CertificateChecker:
                             break
 
         return categories
+
+    def should_notify(self, categories: dict[str, list[dict[str, Any]]]) -> bool:
+        """Send a notification if any buckets have items or it's a scheduled summary day."""
+        if any(categories.values()):
+            return True
+        return datetime.now(UTC).weekday() in self.summary_days
 
     # --------------------------------------------------------------
     # Main Execution
@@ -247,10 +260,6 @@ class CertificateChecker:
 
             categories = self.categorize_certificates(apps)
 
-            all_certs = [cert for group in categories.values() for cert in group]
-
-            changes = self.cache.get_changes(all_certs)
-
             # -------------------------------------------------
             # Print Summary
             # -------------------------------------------------
@@ -258,27 +267,17 @@ class CertificateChecker:
             print("=" * 60)
             for bucket in categories:
                 print(f"{bucket.replace('_', ' ').title()}: {len(categories[bucket])}")
-            print("-" * 60)
-            print(f"New: {len(changes['new'])}")
-            print(f"Removed: {len(changes['removed'])}")
-            print(f"Changed: {len(changes['expiry_changed'])}")
             print("=" * 60)
 
-            # -------------------------------------------------
-            # Update cache BEFORE sending Slack alerts
-            # -------------------------------------------------
-            self.cache.update_certificates(all_certs)
-            self.cache.save_cache()
-
             # Slack notification
-            if self.cache.should_notify(categories, changes, summary_days=self.summary_days):
-                send_slack_notification(categories, self.slack_webhook, changes)
+            if self.should_notify(categories):
+                send_slack_notification(categories, self.slack_webhook)
             else:
                 print("ℹ No notification sent.")
 
             print("\n✓ Certificate check completed successfully")
 
-            if categories.get("expired") or categories.get("tomorrow"):
+            if categories.get("recently_expired") or categories.get("today") or categories.get("tomorrow"):
                 sys.exit(1)
 
         except Exception as e:
