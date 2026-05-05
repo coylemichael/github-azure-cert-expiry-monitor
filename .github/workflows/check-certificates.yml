@@ -50,4 +50,12 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: python -m check_certificates
+        run: |
+          set +e
+          python -m check_certificates
+          exit_code=$?
+          set -e
+          # Exit 1 = expiring certs found (alert sent to Slack, not a CI failure)
+          # Exit 2 = runtime error (actual failure)
+          if [ $exit_code -eq 2 ]; then exit 1; fi
+          exit 0

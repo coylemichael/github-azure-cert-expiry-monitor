@@ -2,9 +2,10 @@ import json
 import subprocess
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
-from typing import Any, cast
+from typing import Any
 
 import pytest
+import time_machine
 from pytest import MonkeyPatch
 
 from check_certificates import EXPIRY_BUCKETS, SUMMARY_DAYS, CertificateChecker
@@ -15,7 +16,7 @@ def _set_env(monkeypatch: MonkeyPatch) -> Generator[None]:
     """Set required env vars for tests and clean up afterward."""
     monkeypatch.setenv("AZURE_TENANT_ID", "tenant")
     monkeypatch.setenv("AZURE_CLIENT_ID", "client")
-    monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://example.com/hook")
+    monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/hook")
     yield
     monkeypatch.delenv("AZURE_CLIENT_SECRET", raising=False)
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
@@ -25,7 +26,7 @@ def test_authenticate_prefers_oidc_when_running_in_actions(monkeypatch: MonkeyPa
     """CI path: uses azure/login token via az; no client secret."""
     monkeypatch.setenv("AZURE_TENANT_ID", "tenant")
     monkeypatch.setenv("AZURE_CLIENT_ID", "client")
-    monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://example.com/hook")
+    monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/hook")
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     monkeypatch.delenv("AZURE_CLIENT_SECRET", raising=False)
 
@@ -49,7 +50,7 @@ def test_authenticate_uses_client_secret_locally(monkeypatch: MonkeyPatch) -> No
     monkeypatch.setenv("AZURE_TENANT_ID", "tenant")
     monkeypatch.setenv("AZURE_CLIENT_ID", "client")
     monkeypatch.setenv("AZURE_CLIENT_SECRET", "secret")
-    monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://example.com/hook")
+    monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/hook")
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
 
     class FakeApp:
@@ -73,25 +74,17 @@ def test_authenticate_raises_when_no_auth_available(monkeypatch: MonkeyPatch) ->
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     monkeypatch.setenv("AZURE_TENANT_ID", "tenant")
     monkeypatch.setenv("AZURE_CLIENT_ID", "client")
-    monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://example.com/hook")
+    monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/hook")
 
     checker = CertificateChecker()
     with pytest.raises(ValueError):
         checker.authenticate()
 
 
-def test_categorize_certificates_buckets_and_skips_expired(monkeypatch: MonkeyPatch) -> None:
+@time_machine.travel(datetime(2025, 1, 1, 12, 0, tzinfo=UTC), tick=False)
+def test_categorize_certificates_buckets_and_skips_expired() -> None:
     """Bucket math: correct placement and old expired items dropped."""
-    # Fixed "now" so bucket math is deterministic
     fixed_now = datetime(2025, 1, 1, 12, 0, tzinfo=UTC)
-
-    class FixedDateTime(datetime):
-        @classmethod
-        def now(cls, tz: Any | None = None) -> "FixedDateTime":
-            current = fixed_now if tz else fixed_now.replace(tzinfo=None)
-            return cast("FixedDateTime", current)
-
-    monkeypatch.setattr("check_certificates.datetime", FixedDateTime)
 
     def iso_in(days: int, hours: int = 0) -> str:
         return (fixed_now + timedelta(days=days, hours=hours)).isoformat().replace("+00:00", "Z")
@@ -185,7 +178,7 @@ def test_run_with_notification(monkeypatch: MonkeyPatch) -> None:
 
 
 def test_run_bubbles_exit_on_error(monkeypatch: MonkeyPatch) -> None:
-    """Run path: on exception we exit(1) after logging."""
+    """Run path: on exception we exit(2) for runtime errors."""
     checker = CertificateChecker()
 
     def fail_auth() -> None:
@@ -193,18 +186,10 @@ def test_run_bubbles_exit_on_error(monkeypatch: MonkeyPatch) -> None:
 
     monkeypatch.setattr(checker, "authenticate", fail_auth)
 
-    exit_called = {}
-
-    def fake_exit(code: int) -> None:
-        exit_called["code"] = code
-        raise SystemExit(code)
-
-    monkeypatch.setattr("sys.exit", fake_exit)
-
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exc_info:
         checker.run()
 
-    assert exit_called.get("code") == 1
+    assert exc_info.value.code == CertificateChecker.EXIT_ERROR
 
 
 def test_constants_guardrails() -> None:

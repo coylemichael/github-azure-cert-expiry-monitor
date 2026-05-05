@@ -9,11 +9,6 @@ on:
       - 'docs/**'
       - '.github/**'
       - 'drift/**'
-    paths-ignore:
-      - 'src/**'
-      - 'tests/**'
-      - 'requirements*.txt'
-      - 'pyproject.toml'
 
 permissions:
   contents: read

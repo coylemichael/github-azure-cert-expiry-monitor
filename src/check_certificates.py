@@ -15,8 +15,12 @@ from typing import Any
 import msal
 import requests
 from dotenv import load_dotenv
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from slack_notifier import send_slack_notification
+
+__all__ = ["CertificateChecker", "EXPIRY_BUCKETS", "SUMMARY_DAYS", "main"]
 
 load_dotenv()
 
@@ -87,8 +91,11 @@ class CertificateChecker:
                 ["az", "account", "get-access-token", "--resource", "https://graph.microsoft.com"],
                 capture_output=True,
                 text=True,
-                check=True,
+                check=False,
             )
+            if az_proc.returncode != 0:
+                print(f"az CLI stderr: {az_proc.stderr.strip()}", file=sys.stderr)
+                raise RuntimeError(f"az account get-access-token failed (exit {az_proc.returncode})")
             token_data = json.loads(az_proc.stdout)
             self.access_token = token_data["accessToken"]
             print("✓ OIDC authentication successful")
@@ -115,14 +122,23 @@ class CertificateChecker:
     # Pull App Registrations Only
     # --------------------------------------------------------------
 
+    @staticmethod
+    def _get_session() -> requests.Session:
+        """Build a requests session with retry/backoff for transient errors."""
+        session = requests.Session()
+        retries = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
+        session.mount("https://", HTTPAdapter(max_retries=retries))
+        return session
+
     def get_app_registrations(self) -> list[dict[str, Any]]:
         headers = {"Authorization": f"Bearer {self.access_token}"}
         all_apps: list[dict[str, Any]] = []
+        session = self._get_session()
 
         url = f"{self.graph_endpoint}/applications?$select=displayName,appId,id,keyCredentials,passwordCredentials"
 
         while url:
-            response = requests.get(url, headers=headers, timeout=30)
+            response = session.get(url, headers=headers, timeout=30)
             response.raise_for_status()
             data = response.json()
             all_apps.extend(data.get("value", []))
@@ -249,6 +265,11 @@ class CertificateChecker:
     # Main Execution
     # --------------------------------------------------------------
 
+    # Exit codes: 0 = all clear, 1 = urgent expiring certs found, 2 = runtime error
+    EXIT_OK = 0
+    EXIT_ALERT = 1
+    EXIT_ERROR = 2
+
     def run(self) -> None:
         try:
             print("Starting Azure App Registration Certificate Check...")
@@ -278,14 +299,16 @@ class CertificateChecker:
             print("\n✓ Certificate check completed successfully")
 
             if categories.get("recently_expired") or categories.get("today") or categories.get("tomorrow"):
-                sys.exit(1)
+                sys.exit(self.EXIT_ALERT)
 
+        except SystemExit:
+            raise
         except Exception as e:
-            print(f"✗ Error: {e}")
+            print(f"✗ Error: {e}", file=sys.stderr)
             import traceback
 
             traceback.print_exc()
-            sys.exit(1)
+            sys.exit(self.EXIT_ERROR)
 
 
 def main() -> None:

@@ -105,11 +105,15 @@ def test_send_slack_notification_sets_color(monkeypatch: MonkeyPatch) -> None:
 
         return Resp()
 
-    monkeypatch.setattr("slack_notifier.requests.post", fake_post)
+    class FakeSession:
+        def post(self, url: str, json: Any = None, timeout: int | float | None = None) -> Any:
+            return fake_post(url, json=json, timeout=timeout)
+
+    monkeypatch.setattr("slack_notifier._get_session", lambda: FakeSession())
 
     # danger: today has items
     cats = {"today": [_fake_cert("one", 0)], "tomorrow": [], "forty_eight_hours": []}
-    send_slack_notification(cats, "https://example.com/hook")
+    send_slack_notification(cats, "https://hooks.slack.com/hook")
     assert captured["payload"]["attachments"][0]["color"] == "danger"
 
     # danger: recently_expired has items
@@ -119,7 +123,7 @@ def test_send_slack_notification_sets_color(monkeypatch: MonkeyPatch) -> None:
         "tomorrow": [],
         "forty_eight_hours": [],
     }
-    send_slack_notification(cats_expired, "https://example.com/hook")
+    send_slack_notification(cats_expired, "https://hooks.slack.com/hook")
     assert captured["payload"]["attachments"][0]["color"] == "danger"
 
     # warning: forty_eight_hours
@@ -128,12 +132,12 @@ def test_send_slack_notification_sets_color(monkeypatch: MonkeyPatch) -> None:
         "tomorrow": [],
         "forty_eight_hours": [_fake_cert("one", 2)],
     }
-    send_slack_notification(cats_warning, "https://example.com/hook")
+    send_slack_notification(cats_warning, "https://hooks.slack.com/hook")
     assert captured["payload"]["attachments"][0]["color"] == "warning"
 
     # good: nothing urgent
     cats_good: dict[str, list[dict[str, Any]]] = {"today": [], "tomorrow": [], "forty_eight_hours": []}
-    send_slack_notification(cats_good, "https://example.com/hook")
+    send_slack_notification(cats_good, "https://hooks.slack.com/hook")
     assert captured["payload"]["attachments"][0]["color"] == "good"
 
 
@@ -143,11 +147,12 @@ def test_send_slack_notification_propagates_errors(monkeypatch: MonkeyPatch) -> 
     class Boom(Exception):
         pass
 
-    def fake_post(url: str, json: Any = None, timeout: int | float | None = None) -> Any:
-        raise Boom("fail")
+    class FakeSession:
+        def post(self, url: str, json: Any = None, timeout: int | float | None = None) -> Any:
+            raise Boom("fail")
 
-    monkeypatch.setattr("slack_notifier.requests.post", fake_post)
+    monkeypatch.setattr("slack_notifier._get_session", lambda: FakeSession())
 
     cats: dict[str, list[dict[str, Any]]] = {"today": [], "tomorrow": [], "forty_eight_hours": []}
     with pytest.raises(Boom):
-        send_slack_notification(cats, "https://example.com/hook")
+        send_slack_notification(cats, "https://hooks.slack.com/hook")

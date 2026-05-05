@@ -9,12 +9,16 @@ Key goals:
 
 from datetime import UTC, date, datetime
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
-UTC = UTC
+__all__ = ["build_slack_blocks", "format_cert_list", "send_slack_notification"]
 
 MAX_SLACK_ITEMS = 10
+MAX_SLACK_BLOCKS = 50
 
 
 def _to_utc_aware(dt: Any) -> datetime:
@@ -203,11 +207,28 @@ def build_slack_blocks(
     return blocks
 
 
+def _get_session() -> requests.Session:
+    """Build a requests session with retry/backoff for transient errors."""
+    session = requests.Session()
+    retries = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
+    session.mount("https://", HTTPAdapter(max_retries=retries))
+    return session
+
+
 def send_slack_notification(
     categories: dict[str, list[dict[str, Any]]],
     webhook_url: str,
 ) -> None:
+    parsed = urlparse(webhook_url)
+    if parsed.scheme != "https" or not parsed.hostname or not parsed.hostname.endswith(".slack.com"):
+        raise ValueError("webhook_url must be an HTTPS Slack URL (*.slack.com)")
+
     blocks = build_slack_blocks(categories)
+
+    # Slack Block Kit limit is 50 blocks per message
+    if len(blocks) > MAX_SLACK_BLOCKS:
+        blocks = blocks[: MAX_SLACK_BLOCKS - 1]
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "_...output truncated_"}})
 
     if categories.get("recently_expired") or categories.get("today") or categories.get("tomorrow"):
         color = "danger"
@@ -226,6 +247,7 @@ def send_slack_notification(
         ],
     }
 
-    response = requests.post(webhook_url, json=payload, timeout=10)
+    session = _get_session()
+    response = session.post(webhook_url, json=payload, timeout=10)
     response.raise_for_status()
     print("Successfully sent Slack notification")
