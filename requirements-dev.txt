@@ -1,5 +1,5 @@
 ruff==0.15.21
-mypy==1.18.2
+mypy==2.2.0
 pytest==9.0.1
 pytest-cov==6.0.0
 time-machine==3.2.0
