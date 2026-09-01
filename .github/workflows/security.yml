@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Snyk Python Scan
         uses: accelins/rx-common-github/actions/snyk-python@main
