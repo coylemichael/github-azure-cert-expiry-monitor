@@ -3,4 +3,4 @@ mypy==1.18.2
 pytest==9.0.1
 pytest-cov==6.0.0
 time-machine==2.16.0
-types-requests==2.33.0.20260518
+types-requests==2.33.0.20260712
