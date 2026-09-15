@@ -1,10 +1,8 @@
 name: Certificate Expiry Check
 
 on:
-  schedule:
-    # Run every Monday and Thursday at 9:00 AM UTC
-    - cron: "0 9 * * 1"
-    - cron: "0 9 * * 4"
+  # No schedule: this public mirror has no Azure or Slack credentials and
+  # is not the deployment. Scheduled runs live in the internal repository.
   workflow_dispatch:
 
 permissions:

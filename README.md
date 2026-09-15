@@ -1,5 +1,11 @@
 # Azure App Registration Credential Expiry Monitor
 
+> **Public mirror.** This is a read-only showcase copy. Development, the live
+> scheduled run and the Slack integration all live in a private internal
+> repository; this mirror holds no credentials and deploys nothing. The
+> `Certificate Expiry Check` workflow here is manual-dispatch only and will
+> not succeed without Azure and Slack secrets.
+
 Checks certificate and client secret expirations on Azure AD **App Registrations** (not enterprise apps) and posts Slack alerts with links straight to the Certificates & Secrets blade. Credentials expired within the last 30 days are included in a "Recently Expired" bucket; anything older is ignored.
 
 ## How it works
